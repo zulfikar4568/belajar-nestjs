@@ -16,11 +16,14 @@ model User {
   updatedAt DateTime @updatedAt
 
 
-  email    String
+  email    String @unique
   password String
 
   firstName String?
   lastName  String?
+
+  @@map("users")
+  posts Post[]
 }
 
 model Post {
@@ -29,5 +32,10 @@ model Post {
   updatedAt DateTime @updatedAt
 
   title       String
-  description String
+  description String?
+
+  userId Int
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("posts")
 }
