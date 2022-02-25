@@ -187,3 +187,75 @@ Jalankan prisma studio
 ```
 npx prisma studio
 ```
+
+Buat prisma module
+```
+nest g module prisma
+nest g service prisma --no-spec
+```
+
+Edit file `src/prisma/prisma.module.ts`
+```ts
+import { Global, Module } from '@nestjs/common';
+import { PrismaService } from './prisma.service';
+
+@Global()
+@Module({
+  providers: [PrismaService],
+  exports: [PrismaService]
+})
+export class PrismaModule {}
+```
+
+Edit file `src/prisma/prisma.service.ts`
+```ts
+import { Injectable } from '@nestjs/common';
+import { PrismaClient } from '@prisma/client';
+
+@Injectable()
+export class PrismaService extends PrismaClient {
+  constructor() {
+    super({
+      datasources: {
+        db: {
+          url: 'postgresql://postgres:123@localhost:5434/nest?schema=public'
+        },
+      },
+    });
+  }
+}
+```
+
+Edit file `src/auth/auth.module.ts`
+```ts
+import { Module } from '@nestjs/common'
+import { PrismaModule } from 'src/prisma/prisma.module';
+import { AuthController } from './auth.controller';
+import { AuthService } from './auth.service';
+
+@Module({
+  imports: [PrismaModule],
+  controllers: [AuthController],
+  providers: [AuthService]
+})
+export class AuthModule {}
+```
+
+Edit file `src/auth/auth.service.ts`
+```ts
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "src/prisma/prisma.service";
+
+
+@Injectable()
+export class AuthService {
+  constructor(private readonly prisma: PrismaService){}
+
+  signup() {
+    return 'Saya sedang signup';
+  }
+  signin() {
+    return 'Saya sedang signin';
+  }
+}
+```
