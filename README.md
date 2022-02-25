@@ -427,7 +427,7 @@ export * from "./auth.dto"
 ### Tambahkan logic login ke dalam service `src/auth/auth.service.ts`
 ```ts
 import { ForbiddenException, Injectable } from "@nestjs/common";
-import { PrismaService } from "src/prisma/prisma.service";
+import { PrismaService } from "../prisma/prisma.service";
 import { AuthDto } from "./dto";
 import * as argon from "argon2";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime";
@@ -533,6 +533,7 @@ export class AuthController {
     return this.authService.signup(dto)
   }
 
+  @HttpCode(HttpStatus.OK)
   @Post('signin')
   signin(@Body() dto: AuthDto) {
     return this.authService.signin(dto)
@@ -549,4 +550,105 @@ curl -X POST http://localhost:3000/auth/signup \
 curl -X POST http://localhost:3000/auth/signin \
    -H 'Content-Type: application/json' \
    -d '{"email": "isnaen@belajar.com", "password": "123"}'
+```
+
+# Buat Strategy Method untuk validasi token dan Nestjs Guard
+
+### Buat file `src/auth/strategy/jwt.strategy.ts`
+```ts
+import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { PassportStrategy } from "@nestjs/passport";
+import { ExtractJwt, Strategy } from "passport-jwt";
+import { PrismaService } from "../../prisma/prisma.service";
+
+@Injectable()
+export class JwtStrategy extends PassportStrategy(Strategy) {
+  constructor(config: ConfigService, private readonly prisma: PrismaService){
+    super({
+      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      secretOrKey: config.get('JWT_SECRET'),
+    })
+  }
+
+  async validate(payload: {sub: number; email: string;}) {
+    const user = await this.prisma.user.findUnique({
+      where: {
+        id: payload.sub,
+      },
+    });
+    delete user.password;
+    return user
+  }
+}
+```
+
+### Buat file `src/auth/strategy/index.ts`
+```ts
+export * from './jwt.strategy'
+```
+
+### Import JwtStrategy di `auth.module.ts`
+```ts
+import { Module } from '@nestjs/common'
+import { JwtModule } from '@nestjs/jwt';
+import { AuthController } from './auth.controller';
+import { AuthService } from './auth.service';
+import { JwtStrategy } from './strategy';
+
+@Module({
+  imports: [JwtModule.register({})],
+  controllers: [AuthController],
+  providers: [AuthService, JwtStrategy]
+})
+export class AuthModule {}
+```
+
+### Buat file guard `src/auth/guards/jwt.guards.ts`
+```ts
+import { AuthGuard } from "@nestjs/passport";
+
+export class JwtGuard extends AuthGuard('jwt') {
+  constructor() {
+    super();
+  }
+}
+```
+
+### Buat file guard `src/auth/guards/index.ts`
+```ts
+export * from './jwt.guard'
+```
+
+### Generate Controller user
+```bash
+nest g controller user --no-spec
+```
+
+### Edit file `user/user.controller.ts`
+```ts
+import { Controller, Get, Patch, UseGuards } from '@nestjs/common';
+import { User } from '@prisma/client';
+import { GetUser } from '../auth/decorator';
+import { JwtGuard } from '../auth/guards';
+
+@UseGuards(JwtGuard)
+@Controller('users')
+export class UserController {
+  @Get('me')
+  getMe(@GetUser() user: User) {
+    return user;
+  }
+
+  @Patch()
+  editUser() {
+
+  }
+}
+```
+
+### Test User me menggunakan Curl
+```bash
+curl -X GET http://localhost:3000/users/me \
+   -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjQsImVtYWlsIjoiaXNuYWVuQGJlbGFqYXIuY29tIiwiaWF0IjoxNjQ1ODI2MTEzLCJleHAiOjE2NDU4MjcwMTN9.bjtOiFtJVIr3lWIuJZoaRwr0TD2sffPgygzedAWDsmE Content-Type: application/json'
 ```
