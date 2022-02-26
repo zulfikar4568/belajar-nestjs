@@ -1,3 +1,12 @@
+<p align="center">
+  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo_text.svg" width="320" alt="Nest Logo" /></a>
+</p>
+
+<p align="center">Belajar Nest js By Zulfikar Isnaen</p>
+
+# Description
+Ini adalah project sederhana authentication dan post, dimana tiap tiap user dapat membuat post. Disini authentication yang digunakan berupa jwt sederhana.
+
 # Inisialisasi Project
 Buat Project Aplikasi Post menggunakan nest js
 ```bash
@@ -989,6 +998,426 @@ describe('App e2e', () => {
           .expectBodyContains(dto.email);
       })
     })
+  });
+})
+```
+
+# Buat API untuk Post
+Buat service dan controller
+```
+nest g service post --no-spec && nest g controller post --no-spec
+```
+
+Edit `src/post/dto/create-post.dto.ts`
+```ts
+import { IsNotEmpty, IsOptional, IsString } from "class-validator";
+
+export class CreatePostDto {
+  @IsString()
+  @IsNotEmpty()
+  title: string;
+
+  @IsString()
+  @IsOptional()
+  description?: string;
+}
+```
+
+Edit `src/post/dto/edit-post.dto.ts`
+```ts
+import { IsOptional, IsString } from "class-validator";
+
+export class EditPostDto {
+  @IsString()
+  @IsOptional()
+  title?: string;
+
+  @IsString()
+  @IsOptional()
+  description?: string;
+}
+```
+
+Edit `src/post/dto/index.ts`
+```
+export * from "./create-post.dto";
+export * from "./edit-post.dto"
+```
+
+Edit `src/post/post.service.ts`
+```ts
+import { ForbiddenException, Injectable } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { CreatePostDto, EditPostDto } from './dto';
+
+@Injectable()
+export class PostService {
+
+  constructor(private readonly prisma: PrismaService){}
+
+  async getPosts(userId: number) {
+    return await this.prisma.post.findMany({
+      where: {
+        userId: userId
+      }
+    })
+  }
+
+  async getPostById(userId: number, postId: number) {
+    return await this.prisma.post.findFirst({
+      where: {
+        userId: userId,
+        id: postId
+      }
+    })
+  }
+
+  async createPost(userId: number, dto: CreatePostDto) {
+    const post = await this.prisma.post.create({
+      data: {
+        userId,
+        ...dto
+      }
+    });
+
+    return post;
+  }
+
+  async editPostById(userId: number, postId: number, dto: EditPostDto) {
+    //get post by id
+    const post = await this.prisma.post.findUnique({
+      where: {
+        id: postId
+      }
+    });
+
+    //cek jika user memiliki post ini
+    if (!post || post.userId !== userId)
+      throw new ForbiddenException(
+        'Access to resource post denied!'
+      );
+    
+    return this.prisma.post.update({
+      where: {
+        id: postId,
+      },
+      data: {
+        ...dto,
+      }
+    })
+  }
+
+  async deletePostById(userId: number, postId: number) {
+    const post = await this.prisma.post.findUnique({
+      where: {
+        id: postId
+      }
+    });
+
+    //cek jika user memiliki post ini
+    if (!post || post.userId !== userId)
+      throw new ForbiddenException(
+        'Access to resource post denied!'
+      );
+
+    await this.prisma.post.delete({
+      where: {
+        id: postId,
+      }
+    })
+  }
+}
+```
+
+Edit `src/post/post.controller.ts`
+```ts
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import { GetUser } from '../auth/decorator';
+import { JwtGuard } from '../auth/guards';
+import { CreatePostDto, EditPostDto } from './dto';
+import { PostService } from './post.service';
+
+@UseGuards(JwtGuard)
+@Controller('posts')
+export class PostController {
+
+  constructor(private readonly postService: PostService){}
+
+  @Get()
+  getPosts(@GetUser('id') userId: number) {
+    return this.postService.getPosts(userId);
+  }
+
+  @Get(':id')
+  getPostById(@GetUser('id') userId: number, @Param('id', ParseIntPipe) postId: number) {
+    return this.postService.getPostById(userId, postId);
+  }
+
+  @Post()
+  createPost(@GetUser('id') userId: number, @Body() dto: CreatePostDto) {
+    return this.postService.createPost(userId, dto);
+  }
+
+  @Patch(':id')
+  editPostById(@GetUser('id') userId: number,@Param('id', ParseIntPipe) postId: number,  @Body() dto: EditPostDto) {
+    return this.postService.editPostById(userId, postId, dto);
+  }
+
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Delete(':id')
+  deletePostById(@GetUser('id') userId: number, @Param('id', ParseIntPipe) postId: number) {
+    return this.postService.deletePostById(userId, postId);
+  }
+}
+```
+
+Edit testing file `test/app.e2e-spec.ts`
+```ts
+import { INestApplication, ValidationPipe } from "@nestjs/common";
+import { Test } from "@nestjs/testing";
+import { PrismaService } from "../src/prisma/prisma.service";
+import { AppModule } from "../src/app.module";
+import * as pactum from "pactum";
+import { AuthDto } from "../src/auth/dto";
+import { EditUserDto } from "../src/user/dto";
+import { CreatePostDto } from "src/post/dto";
+
+describe('App e2e', () => {
+  let app: INestApplication;
+  let prisma: PrismaService;
+
+  beforeAll(async () => {
+    const moduleRef =
+      await Test.createTestingModule({
+        imports: [AppModule],
+      }).compile();
+
+    app = moduleRef.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+      }),
+    );
+    await app.init();
+    await app.listen(3333);
+
+    prisma = app.get(PrismaService);
+    await prisma.cleanDB();
+    pactum.request.setBaseUrl(
+      'http://localhost:3333',
+    );
+  });
+
+  afterAll(() => {
+    app.close();
+  });
+
+  describe('Auth', () => {
+    const dto: AuthDto = {
+      email: "isnaen@gmail.com",
+      password: "password123"
+    }
+
+    describe('Signup', () => {
+      it('Signup akan Error jika email kosong!', () => {
+        return pactum
+          .spec()
+          .post('/auth/signup')
+          .withBody({
+            password: dto.password
+          })
+          .expectStatus(400);
+      });
+      it('Signup akan Error jika Password kosong!', () => {
+        return pactum
+          .spec()
+          .post('/auth/signup')
+          .withBody({
+            email: dto.email
+          })
+          .expectStatus(400);
+      });
+      it('Signup akan Error jika tanpa body!', () => {
+        return pactum
+          .spec()
+          .post('/auth/signup')
+          .expectStatus(400);
+      });
+      it('Berhasil Signup!', () =>{
+        return pactum
+          .spec()
+          .post('/auth/signup')
+          .withBody(dto)
+          .expectStatus(201);
+      });
+    });
+
+    describe('Signin', () => {
+      it('Signin akan Error jika email kosong!', () => {
+        return pactum
+          .spec()
+          .post('/auth/signin')
+          .withBody({
+            password: dto.password
+          })
+          .expectStatus(400);
+      });
+      it('Signin akan Error jika Password kosong!', () => {
+        return pactum
+          .spec()
+          .post('/auth/signin')
+          .withBody({
+            email: dto.email
+          })
+          .expectStatus(400);
+      });
+      it('Signin akan Error jika tanpa body!', () => {
+        return pactum
+          .spec()
+          .post('/auth/signin')
+          .expectStatus(400);
+      });
+      it('Berhasil Signin!', () => {
+        return pactum
+          .spec()
+          .post('/auth/signin')
+          .withBody(dto)
+          .expectStatus(200)
+          .stores('userAccessToken', 'access_token');
+      });
+    });
+  });
+
+  describe('User', () => {
+    describe('Get me', () => {
+      it('Berhasil mendapatkan user sekarang yang sedang login!', () => {
+        return pactum
+          .spec()
+          .get('/users/me')
+          .withHeaders({
+            Authorization: `Bearer $S{userAccessToken}`
+          })
+          .expectStatus(200);
+      });
+    });
+    describe('Edit user', () => {
+      it('Berhasil mengedit user!', () => {
+        const dto: EditUserDto = {
+          firstName: "Zulfikar",
+          lastName: "Isnaen",
+          email: 'isnaen70@gmail.com'
+        }
+        return pactum
+          .spec()
+          .patch('/users')
+          .withHeaders({
+            Authorization: `Bearer $S{userAccessToken}`
+          })
+          .withBody(dto)
+          .expectStatus(200)
+          .expectBodyContains(dto.firstName)
+          .expectBodyContains(dto.lastName)
+          .expectBodyContains(dto.email);
+      })
+    })
+  });
+
+  describe('Post', () => {
+    describe('Get Empty Posts', () => {
+      it('Berhasil mendapatkan Post kosong!', () => {
+        return pactum
+          .spec()
+          .get('/posts')
+          .withHeaders({
+            Authorization: `Bearer $S{userAccessToken}`
+          })
+          .expectStatus(200)
+          .expectBody([]);
+      })
+    });
+    describe('Create Post', () => {
+      const dto: CreatePostDto = {
+        title: "Post Pertama",
+        description:"Ini adalah Post pertama"
+      }
+      it('Berhasil membuat Post!', () => {
+        return pactum
+          .spec()
+          .post('/posts')
+          .withHeaders({
+            Authorization: `Bearer $S{userAccessToken}`
+          })
+          .withBody(dto)
+          .expectStatus(201)
+          .stores('postId', 'id');
+      })
+    });
+    describe('Get Posts', () => {
+      it('Berhasil mendapatkan Semua Post!', () => {
+        return pactum
+          .spec()
+          .get('/posts')
+          .withHeaders({
+            Authorization: `Bearer $S{userAccessToken}`
+          })
+          .expectStatus(200)
+          .expectJsonLength(1);
+      })
+    });
+    describe('Get Post By Id', () => {
+      it('Berhasil mendapatkan Post by Id!', () => {
+        return pactum
+          .spec()
+          .get('/posts/{id}')
+          .withPathParams('id', `$S{postId}`)
+          .withHeaders({
+            Authorization: `Bearer $S{userAccessToken}`
+          })
+          .expectStatus(200)
+          .expectBodyContains(`$S{postId}`);
+      })
+    });
+    describe('Edit Post', () => {
+      const dto: CreatePostDto = {
+        title: "Post Pertama Hasil Edit",
+        description:"Ini adalah Post pertama Hasil Edit"
+      }
+      it('Berhasil Mengedit Post by Id!', () => {
+        return pactum
+          .spec()
+          .patch('/posts/{id}')
+          .withPathParams('id', `$S{postId}`)
+          .withBody(dto)
+          .withHeaders({
+            Authorization: `Bearer $S{userAccessToken}`
+          })
+          .expectStatus(200)
+          .expectBodyContains(dto.title)
+          .expectBodyContains(dto.description);
+      })
+    });
+    describe('Delete Post', () => {
+      it('Berhasil Menghapus Post by Id!', () => {
+        return pactum
+          .spec()
+          .delete('/posts/{id}')
+          .withPathParams('id', `$S{postId}`)
+          .withHeaders({
+            Authorization: `Bearer $S{userAccessToken}`
+          })
+          .expectStatus(204);
+      });
+      it('Berhasil Mendapatkan Post kosong!', () => {
+        return pactum
+          .spec()
+          .get('/posts')
+          .withHeaders({
+            Authorization: `Bearer $S{userAccessToken}`
+          })
+          .expectStatus(200)
+          .expectJsonLength(0);
+      })
+    });
   });
 })
 ```
