@@ -652,3 +652,343 @@ export class UserController {
 curl -X GET http://localhost:3000/users/me \
    -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjQsImVtYWlsIjoiaXNuYWVuQGJlbGFqYXIuY29tIiwiaWF0IjoxNjQ1ODI2MTEzLCJleHAiOjE2NDU4MjcwMTN9.bjtOiFtJVIr3lWIuJZoaRwr0TD2sffPgygzedAWDsmE Content-Type: application/json'
 ```
+
+# E2E (End to End ) Testing
+
+Buat database untuk Testing di Docker Compose
+```yml
+version: '3.8'
+services:
+  dev-db:
+    image: postgres:13
+    ports:
+      - 5434:5432
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123
+      POSTGRES_DB: nest
+    networks:
+      - belajar-nestjs
+  test-db:
+    image: postgres:13
+    ports:
+      - 5435:5432
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123
+      POSTGRES_DB: nest
+    networks:
+      - belajar-nestjs
+networks:
+  belajar-nestjs:
+```
+
+Install Pactum
+```bash
+npm install -D pactum
+```
+
+Install Dotenv cli
+```
+npm install -D dotenv-cli
+```
+
+Buat file environment untuk testing `.env.test`
+```
+DATABASE_URL="postgresql://postgres:123@localhost:5435/nest?schema=public"
+JWT_SECRET='ini-secret-untuk-jwt'
+```
+
+Edit file di `package.json`
+```ts
+"scripts": {
+    "prisma:dev:studio": "prisma studio",
+    "prisma:dev:deploy": "prisma migrate deploy",
+    "db:dev:rm": "docker-compose rm -f -s -v dev-db",
+    "db:dev:up": "docker-compose up -d dev-db",
+    "db:dev:restart": "npm run db:dev:rm && npm run db:dev:up && sleep 2 && npm run prisma:dev:deploy",
+    "prisma:test:studio": "dotenv -e .env.test -- prisma studio",
+    "prisma:test:deploy": "dotenv -e .env.test -- prisma migrate deploy",
+    "db:test:rm": "docker-compose rm -f -s -v test-db",
+    "db:test:up": "docker-compose up -d test-db",
+    "db:test:restart": "npm run db:test:rm && npm run db:test:up && sleep 2 && npm run prisma:test:deploy",
+    "prebuild": "rimraf dist",
+    "build": "nest build",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:debug": "nest start --debug --watch",
+    "start:prod": "node dist/main",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
+    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
+    "pretest:e2e": "npm run db:test:restart",
+    "test:e2e": "dotenv -e .env.test -- jest --watch --no-cache --config ./test/jest-e2e.json"
+  }
+```
+Jalankan Testing
+```
+npm run test:e2e
+```
+
+Tambahkan script di `prisma.service.ts` untuk clean database
+```ts
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { PrismaClient } from '@prisma/client';
+
+@Injectable()
+export class PrismaService extends PrismaClient {
+  constructor(config: ConfigService) {
+    super({
+      datasources: {
+        db: {
+          url: config.get('DATABASE_URL')
+        },
+      },
+    });
+  }
+
+  cleanDB() {
+    return this.$transaction([
+      this.post.deleteMany(),
+      this.user.deleteMany(),
+    ])
+  }
+}
+```
+Buat API Edit User
+```
+nest g service user --no-spec
+```
+
+Buat Dto file `src/user/dto/edit-user.dto.ts` untuk Edit User
+```ts
+import { IsEmail, IsOptional, IsString } from "class-validator";
+
+export class EditUserDto {
+  @IsEmail()
+  @IsOptional()
+  email?: string;
+
+  @IsString()
+  @IsOptional()
+  firstName?: string;
+
+  @IsString()
+  @IsOptional()
+  lastName?: string;
+}
+```
+
+Export ke `src/user/dto/index.ts`
+```ts
+export * from './edit-user.dto'
+```
+
+Edit `src/user/user.controller.ts`
+```ts
+import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
+import { User } from '@prisma/client';
+import { GetUser } from '../auth/decorator';
+import { JwtGuard } from '../auth/guards';
+import { EditUserDto } from './dto';
+import { UserService } from './user.service';
+
+@UseGuards(JwtGuard)
+@Controller('users')
+export class UserController {
+  constructor(private readonly userService: UserService){}
+
+  @Get('me')
+  getMe(@GetUser() user: User) {
+    return user;
+  }
+
+  @Patch()
+  editUser(@Body() dto: EditUserDto, @GetUser('id') userId: number) {
+    return this.userService.editUser(userId, dto);
+  }
+}
+```
+
+Edit file `src/user/user.service.ts`
+```ts
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { EditUserDto } from './dto';
+
+@Injectable()
+export class UserService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async editUser(userId: number, dto: EditUserDto) {
+    const user = await this.prisma.user.update({
+      where: {
+        id: userId,
+      },
+      data: {
+        ...dto,
+      },
+    });
+
+    delete user.password;
+
+    return user;
+  }
+}
+```
+
+Edit file `app.e2e-spec.ts` untuk testing
+```ts
+import { INestApplication, ValidationPipe } from "@nestjs/common";
+import { Test } from "@nestjs/testing";
+import { PrismaService } from "../src/prisma/prisma.service";
+import { AppModule } from "../src/app.module";
+import * as pactum from "pactum";
+import { AuthDto } from "../src/auth/dto";
+import { EditUserDto } from "../src/user/dto";
+
+describe('App e2e', () => {
+  let app: INestApplication;
+  let prisma: PrismaService;
+
+  beforeAll(async () => {
+    const moduleRef =
+      await Test.createTestingModule({
+        imports: [AppModule],
+      }).compile();
+
+    app = moduleRef.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+      }),
+    );
+    await app.init();
+    await app.listen(3333);
+
+    prisma = app.get(PrismaService);
+    await prisma.cleanDB();
+    pactum.request.setBaseUrl(
+      'http://localhost:3333',
+    );
+  });
+
+  afterAll(() => {
+    app.close();
+  });
+
+  describe('Auth', () => {
+    const dto: AuthDto = {
+      email: "isnaen@gmail.com",
+      password: "password123"
+    }
+
+    describe('Signup', () => {
+      it('Signup akan Error jika email kosong!', () => {
+        return pactum
+          .spec()
+          .post('/auth/signup')
+          .withBody({
+            password: dto.password
+          })
+          .expectStatus(400);
+      });
+      it('Signup akan Error jika Password kosong!', () => {
+        return pactum
+          .spec()
+          .post('/auth/signup')
+          .withBody({
+            email: dto.email
+          })
+          .expectStatus(400);
+      });
+      it('Signup akan Error jika tanpa body!', () => {
+        return pactum
+          .spec()
+          .post('/auth/signup')
+          .expectStatus(400);
+      });
+      it('Berhasil Signup!', () =>{
+        return pactum
+          .spec()
+          .post('/auth/signup')
+          .withBody(dto)
+          .expectStatus(201);
+      });
+    });
+
+    describe('Signin', () => {
+      it('Signin akan Error jika email kosong!', () => {
+        return pactum
+          .spec()
+          .post('/auth/signin')
+          .withBody({
+            password: dto.password
+          })
+          .expectStatus(400);
+      });
+      it('Signin akan Error jika Password kosong!', () => {
+        return pactum
+          .spec()
+          .post('/auth/signin')
+          .withBody({
+            email: dto.email
+          })
+          .expectStatus(400);
+      });
+      it('Signin akan Error jika tanpa body!', () => {
+        return pactum
+          .spec()
+          .post('/auth/signin')
+          .expectStatus(400);
+      });
+      it('Berhasil Signin!', () => {
+        return pactum
+          .spec()
+          .post('/auth/signin')
+          .withBody(dto)
+          .expectStatus(200)
+          .stores('userAccessToken', 'access_token');
+      });
+    });
+  });
+
+  describe('User', () => {
+    describe('Get me', () => {
+      it('Berhasil mendapatkan user sekarang yang sedang login!', () => {
+        return pactum
+          .spec()
+          .get('/users/me')
+          .withHeaders({
+            Authorization: `Bearer $S{userAccessToken}`
+          })
+          .expectStatus(200);
+      });
+    });
+    describe('Edit user', () => {
+      it('Berhasil mengedit user!', () => {
+        const dto: EditUserDto = {
+          firstName: "Zulfikar",
+          lastName: "Isnaen",
+          email: 'isnaen70@gmail.com'
+        }
+        return pactum
+          .spec()
+          .patch('/users')
+          .withHeaders({
+            Authorization: `Bearer $S{userAccessToken}`
+          })
+          .withBody(dto)
+          .expectStatus(200)
+          .expectBodyContains(dto.firstName)
+          .expectBodyContains(dto.lastName)
+          .expectBodyContains(dto.email);
+      })
+    })
+  });
+})
+```
