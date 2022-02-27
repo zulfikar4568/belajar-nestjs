@@ -5,10 +5,10 @@
 <p align="center">Belajar Nest js By Zulfikar Isnaen</p>
 
 # Description
-Ini adalah project sederhana authentication dan post, dimana tiap tiap user dapat membuat post. Disini authentication yang digunakan berupa jwt sederhana.
+Ini adalah project sederhana authentication dan blog post, dimana tiap tiap user dapat membuat post. Disini authentication yang digunakan berupa jwt sederhana.
 
 # Inisialisasi Project
-Buat Project Aplikasi Post menggunakan nest js
+Buat Project Aplikasi Blog Post menggunakan nest js
 ```bash
 nest new belajar-nestjs
 ```
@@ -1420,4 +1420,105 @@ describe('App e2e', () => {
     });
   });
 })
+```
+
+# Open API menggunakan Swagger UI
+Install swagger
+```bash
+npm install --save @nestjs/swagger swagger-ui-express
+```
+
+Edit `main.ts`
+```ts
+import { ValidationPipe } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { AppModule } from './app.module';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist: true
+  }));
+
+  const option = {
+    customCss: `
+    .topbar-wrapper img {content:url(\'https://www.pngarts.com/files/2/Letter-Z-PNG-Image-Transparent.png'); width:100px; height:auto;}
+    .swagger-ui .topbar { background-color: #fafafa; }`,
+    customfavIcon: 'https://www.pngarts.com/files/2/Letter-Z-PNG-Image-Transparent.png',
+    customSiteTitle: 'Post API by Zulfikar'
+  }
+
+  const config = new DocumentBuilder()
+    .setTitle('Post API')
+    .setDescription('Ini adalah Post API dengan user Authentication sederhana by Zulfikar :)')
+    .setVersion('1.0')
+    .addBearerAuth(
+      { 
+        // I was also testing it without prefix 'Bearer ' before the JWT
+        description: `[just text field] Please enter token in following format: Bearer <JWT>`,
+        name: 'Authorization',
+        bearerFormat: 'Bearer', // I`ve tested not to use this field, but the result was the same
+        scheme: 'Bearer',
+        type: 'http', // I`ve attempted type: 'apiKey' too
+        in: 'Header'
+      },
+      'access-token', // This name here is important for matching up with @ApiBearerAuth() in your controller!
+    )
+    .build()
+
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('/', app, document, option);
+
+  await app.listen(3000);
+}
+bootstrap();
+```
+
+Edit Dto kalian misalkan `auth.dto.ts`
+```ts
+import { ApiProperty } from "@nestjs/swagger";
+import { IsEmail, IsNotEmpty, IsString } from "class-validator";
+
+export class AuthDto {
+  @ApiProperty({ example: 'isnaen@gmail.com', description: 'Masukan email kamu di sini' })
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+
+  @ApiProperty({ example: 'password123', description: 'Masukan password kamu di sini' })
+  @IsString()
+  @IsNotEmpty()
+  password: string;
+}
+```
+
+Lalu tambahkan di `auth.controller.ts`
+```ts
+
+import { Body, Controller, HttpCode, HttpStatus, Post } from "@nestjs/common";
+import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { AuthService } from "./auth.service";
+import { AuthDto } from "./dto";
+
+@ApiTags('auth')
+@Controller('auth')
+export class AuthController {
+  constructor(private readonly authService: AuthService) { }
+
+  @ApiOperation({ summary: 'API ini digunakan untuk Signup' })
+  @ApiResponse({ status: 201, description: '{ "access_token": "token kamu nanti ada di sini"}' })
+  @Post('signup')
+  signup(@Body() dto: AuthDto) {
+    return this.authService.signup(dto)
+  }
+  
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'API ini digunakan untuk Signin' })
+  @ApiResponse({ status: 200, description: '{ "access_token": "token kamu nanti ada di sini"}' })
+  @Post('signin')
+  signin(@Body() dto: AuthDto) {
+    return this.authService.signin(dto)
+  }
+}
 ```
