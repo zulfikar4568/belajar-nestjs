@@ -1,8 +1,8 @@
 <p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo_text.svg" width="320" alt="Nest Logo" /></a>
+  <a href="https://github.com/zulfikar4568/" target="blank"><img src="https://www.pngarts.com/files/2/Letter-Z-PNG-Image-Transparent.png" width="200" alt="Nest Logo" /></a>
 </p>
 
-<p align="center">Belajar Nest js By Zulfikar Isnaen</p>
+<p align="center">Belajar Nest js By Zulfikar Isnaen :)</p>
 
 # Description
 Ini adalah project sederhana authentication dan blog post, dimana tiap tiap user dapat membuat post. Disini authentication yang digunakan berupa jwt sederhana.
@@ -1521,4 +1521,16 @@ export class AuthController {
     return this.authService.signin(dto)
   }
 }
+```
+
+# Production to Heroku
+Buka heroku lalu create aplikasi di heroku, lalu tambahkan heroku postgres di heroku app kamu.
+Install terlebih dahulu Heroku CLI di komputer kamu
+```
+heroku git:remote -a <nama-aplikasi-kamu>
+heroku config:set NPM_CONFIG_PRODUCTION=false
+heroku config:set JWT_SECRET=poiasdkfwe87324osadsadasd23213ids9sdf09sdf723uywe8
+git add .
+git commit -m "add: production ready"
+git push heroku master
 ```
