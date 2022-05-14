@@ -6,6 +6,7 @@
 
 # Description
 Ini adalah project sederhana authentication dan blog post, dimana tiap tiap user dapat membuat post. Disini authentication yang digunakan berupa jwt sederhana.
+[Lihat Demo](https://blog-post-zulfikar.herokuapp.com/)
 
 # Inisialisasi Project
 Buat Project Aplikasi Blog Post menggunakan nest js
