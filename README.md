@@ -1666,8 +1666,6 @@ useDotenv: true
 frameworkVersion: '3'
 
 plugins:
-  - serverless-plugin-typescript
-  - serverless-plugin-optimize
   - serverless-offline
 
 provider:
@@ -1679,15 +1677,16 @@ provider:
 
 functions:
   main:
-    handler: src/serverless/lambda.handler
+    handler: dist/serverless/lambda.handler
     events:
       - http:
           path: /{any+}
           method: any
 
-custom:
-  optimize:
-    external: ['swagger-ui-dist']
+package:
+  exclude:
+    - node_modules/**
+    - venv/**
 ```
 
 ### Running Serverless Locally

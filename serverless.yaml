@@ -23,3 +23,8 @@ functions:
       - http:
           path: /{any+}
           method: any
+
+package:
+  exclude:
+    - node_modules/**
+    - venv/**
