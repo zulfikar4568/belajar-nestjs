@@ -1539,7 +1539,8 @@ git push heroku master
 # Serverless
 ```bash
 yarn add aws-serverless-express aws-lambda
-yarn add -D serverless-plugin-typescript serverless-plugin-optimize serverless-offline plugin
+yarn add -D serverless-offline plugin
+serverless --org=zulfikar4568
 ```
 
 Buat file di src/serverless/lambda.ts
