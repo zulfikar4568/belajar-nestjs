@@ -1,0 +1,31 @@
+org: zulfikar4568
+app: blog-post-serverless
+service: blog-post-serverless
+
+useDotenv: true
+
+frameworkVersion: '3'
+
+plugins:
+  - serverless-plugin-typescript
+  - serverless-plugin-optimize
+  - serverless-offline
+
+provider:
+  name: aws
+  runtime: nodejs14.x
+  environment:
+    JWT_SECRET: ${env:JWT_SECRET}
+    DATABASE_URL: ${env:DATABASE_URL}
+
+functions:
+  main:
+    handler: src/serverless/lambda.handler
+    events:
+      - http:
+          path: /{any+}
+          method: any
+
+custom:
+  optimize:
+    external: ['swagger-ui-dist']
