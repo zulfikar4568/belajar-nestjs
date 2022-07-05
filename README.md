@@ -1680,13 +1680,11 @@ functions:
     handler: dist/serverless/lambda.handler
     events:
       - http:
-          path: /{any+}
-          method: any
-
-package:
-  exclude:
-    - node_modules/**
-    - venv/**
+          method: ANY
+          path: /
+      - http:
+          method: ANY
+          path: '{proxy+}'
 ```
 
 ### Running Serverless Locally
