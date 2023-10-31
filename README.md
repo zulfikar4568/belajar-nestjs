@@ -225,19 +225,16 @@ export class PrismaModule {}
 
 ### Edit file `src/prisma/prisma.service.ts`
 ```ts
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 
 @Injectable()
-export class PrismaService extends PrismaClient {
-  constructor() {
-    super({
-      datasources: {
-        db: {
-          url: 'postgresql://postgres:123@localhost:5434/nest?schema=public'
-        },
-      },
-    });
+export default class PrismaService
+  extends PrismaClient
+  implements OnModuleInit
+{
+  async onModuleInit() {
+    await this.$connect();
   }
 }
 ```
