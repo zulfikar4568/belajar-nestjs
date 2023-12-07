@@ -520,7 +520,9 @@ export class AuthService {
       secret: secretJwt,
     });
 
-    return token;
+    return {
+      access_token: token,
+    }
   }
 }
 ```
