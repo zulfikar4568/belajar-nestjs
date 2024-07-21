@@ -6,6 +6,12 @@ import { PostModule } from './post/post.module';
 import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
-  imports: [ConfigModule.forRoot({isGlobal: true}), AuthModule, UserModule, PostModule, PrismaModule],
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    AuthModule,
+    UserModule,
+    PostModule,
+    PrismaModule,
+  ],
 })
 export class AppModule {}

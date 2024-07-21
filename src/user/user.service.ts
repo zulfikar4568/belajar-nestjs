@@ -4,9 +4,14 @@ import { EditUserDto } from './dto';
 
 @Injectable()
 export class UserService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+  ) {}
 
-  async editUser(userId: number, dto: EditUserDto) {
+  async editUser(
+    userId: number,
+    dto: EditUserDto,
+  ) {
     const user = await this.prisma.user.update({
       where: {
         id: userId,

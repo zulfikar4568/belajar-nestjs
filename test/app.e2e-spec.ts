@@ -1,11 +1,14 @@
-import { INestApplication, ValidationPipe } from "@nestjs/common";
-import { Test } from "@nestjs/testing";
-import { PrismaService } from "../src/prisma/prisma.service";
-import { AppModule } from "../src/app.module";
-import * as pactum from "pactum";
-import { AuthDto } from "../src/auth/dto";
-import { EditUserDto } from "../src/user/dto";
-import { CreatePostDto } from "src/post/dto";
+import {
+  INestApplication,
+  ValidationPipe,
+} from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import { PrismaService } from '../src/prisma/prisma.service';
+import { AppModule } from '../src/app.module';
+import * as pactum from 'pactum';
+import { AuthDto } from '../src/auth/dto';
+import { EditUserDto } from '../src/user/dto';
+import { CreatePostDto } from 'src/post/dto';
 
 describe('App e2e', () => {
   let app: INestApplication;
@@ -39,9 +42,9 @@ describe('App e2e', () => {
 
   describe('Auth', () => {
     const dto: AuthDto = {
-      email: "isnaen@gmail.com",
-      password: "password123"
-    }
+      email: 'isnaen@gmail.com',
+      password: 'password123',
+    };
 
     describe('Signup', () => {
       it('Signup akan Error jika email kosong!', () => {
@@ -49,7 +52,7 @@ describe('App e2e', () => {
           .spec()
           .post('/auth/signup')
           .withBody({
-            password: dto.password
+            password: dto.password,
           })
           .expectStatus(400);
       });
@@ -58,7 +61,7 @@ describe('App e2e', () => {
           .spec()
           .post('/auth/signup')
           .withBody({
-            email: dto.email
+            email: dto.email,
           })
           .expectStatus(400);
       });
@@ -68,7 +71,7 @@ describe('App e2e', () => {
           .post('/auth/signup')
           .expectStatus(400);
       });
-      it('Berhasil Signup!', () =>{
+      it('Berhasil Signup!', () => {
         return pactum
           .spec()
           .post('/auth/signup')
@@ -83,7 +86,7 @@ describe('App e2e', () => {
           .spec()
           .post('/auth/signin')
           .withBody({
-            password: dto.password
+            password: dto.password,
           })
           .expectStatus(400);
       });
@@ -92,7 +95,7 @@ describe('App e2e', () => {
           .spec()
           .post('/auth/signin')
           .withBody({
-            email: dto.email
+            email: dto.email,
           })
           .expectStatus(400);
       });
@@ -108,7 +111,10 @@ describe('App e2e', () => {
           .post('/auth/signin')
           .withBody(dto)
           .expectStatus(200)
-          .stores('userAccessToken', 'access_token');
+          .stores(
+            'userAccessToken',
+            'access_token',
+          );
       });
     });
   });
@@ -120,7 +126,7 @@ describe('App e2e', () => {
           .spec()
           .get('/users/me')
           .withHeaders({
-            Authorization: `Bearer $S{userAccessToken}`
+            Authorization: `Bearer $S{userAccessToken}`,
           })
           .expectStatus(200);
       });
@@ -128,23 +134,23 @@ describe('App e2e', () => {
     describe('Edit user', () => {
       it('Berhasil mengedit user!', () => {
         const dto: EditUserDto = {
-          firstName: "Zulfikar",
-          lastName: "Isnaen",
-          email: 'isnaen70@gmail.com'
-        }
+          firstName: 'Zulfikar',
+          lastName: 'Isnaen',
+          email: 'isnaen70@gmail.com',
+        };
         return pactum
           .spec()
           .patch('/users')
           .withHeaders({
-            Authorization: `Bearer $S{userAccessToken}`
+            Authorization: `Bearer $S{userAccessToken}`,
           })
           .withBody(dto)
           .expectStatus(200)
           .expectBodyContains(dto.firstName)
           .expectBodyContains(dto.lastName)
           .expectBodyContains(dto.email);
-      })
-    })
+      });
+    });
   });
 
   describe('Post', () => {
@@ -154,28 +160,28 @@ describe('App e2e', () => {
           .spec()
           .get('/posts')
           .withHeaders({
-            Authorization: `Bearer $S{userAccessToken}`
+            Authorization: `Bearer $S{userAccessToken}`,
           })
           .expectStatus(200)
           .expectBody([]);
-      })
+      });
     });
     describe('Create Post', () => {
       const dto: CreatePostDto = {
-        title: "Post Pertama",
-        description:"Ini adalah Post pertama"
-      }
+        title: 'Post Pertama',
+        description: 'Ini adalah Post pertama',
+      };
       it('Berhasil membuat Post!', () => {
         return pactum
           .spec()
           .post('/posts')
           .withHeaders({
-            Authorization: `Bearer $S{userAccessToken}`
+            Authorization: `Bearer $S{userAccessToken}`,
           })
           .withBody(dto)
           .expectStatus(201)
           .stores('postId', 'id');
-      })
+      });
     });
     describe('Get Posts', () => {
       it('Berhasil mendapatkan Semua Post!', () => {
@@ -183,11 +189,11 @@ describe('App e2e', () => {
           .spec()
           .get('/posts')
           .withHeaders({
-            Authorization: `Bearer $S{userAccessToken}`
+            Authorization: `Bearer $S{userAccessToken}`,
           })
           .expectStatus(200)
           .expectJsonLength(1);
-      })
+      });
     });
     describe('Get Post By Id', () => {
       it('Berhasil mendapatkan Post by Id!', () => {
@@ -196,17 +202,18 @@ describe('App e2e', () => {
           .get('/posts/{id}')
           .withPathParams('id', `$S{postId}`)
           .withHeaders({
-            Authorization: `Bearer $S{userAccessToken}`
+            Authorization: `Bearer $S{userAccessToken}`,
           })
           .expectStatus(200)
           .expectBodyContains(`$S{postId}`);
-      })
+      });
     });
     describe('Edit Post', () => {
       const dto: CreatePostDto = {
-        title: "Post Pertama Hasil Edit",
-        description:"Ini adalah Post pertama Hasil Edit"
-      }
+        title: 'Post Pertama Hasil Edit',
+        description:
+          'Ini adalah Post pertama Hasil Edit',
+      };
       it('Berhasil Mengedit Post by Id!', () => {
         return pactum
           .spec()
@@ -214,12 +221,12 @@ describe('App e2e', () => {
           .withPathParams('id', `$S{postId}`)
           .withBody(dto)
           .withHeaders({
-            Authorization: `Bearer $S{userAccessToken}`
+            Authorization: `Bearer $S{userAccessToken}`,
           })
           .expectStatus(200)
           .expectBodyContains(dto.title)
           .expectBodyContains(dto.description);
-      })
+      });
     });
     describe('Delete Post', () => {
       it('Berhasil Menghapus Post by Id!', () => {
@@ -228,7 +235,7 @@ describe('App e2e', () => {
           .delete('/posts/{id}')
           .withPathParams('id', `$S{postId}`)
           .withHeaders({
-            Authorization: `Bearer $S{userAccessToken}`
+            Authorization: `Bearer $S{userAccessToken}`,
           })
           .expectStatus(204);
       });
@@ -237,11 +244,11 @@ describe('App e2e', () => {
           .spec()
           .get('/posts')
           .withHeaders({
-            Authorization: `Bearer $S{userAccessToken}`
+            Authorization: `Bearer $S{userAccessToken}`,
           })
           .expectStatus(200)
           .expectJsonLength(0);
-      })
+      });
     });
   });
-})
+});
